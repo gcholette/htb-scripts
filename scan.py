@@ -6,8 +6,6 @@ import json
 import os
 from functools import reduce
 
-# TODO - make cache per target 
-
 target = None
 no_cache = False
 
@@ -23,7 +21,7 @@ ffuf_report_path = lambda x: os.path.join(script_dir, f"data/{x}/ffuf_scan.json"
 allowed_ports_for_subdomain_enum = [80, 443, 5000]
 
 true_false = [True, False]
-possible_codes = ['', '200', '301', '302', '200,301', '301,302', '200,302', '200,301,302']
+possible_codes = ['', '200', '403', '500', '401', '301', '302', '200,301', '301,302', '200,302', '200,301,302']
 disallowed_sizes = []
 
 subdomain_enum_args = [(x, y, '') for x in true_false for y in possible_codes]
@@ -37,7 +35,10 @@ def run_subdomain_enum_scan(target, args, wordlist):
     command = f"ffuf -u {protocol}://{target} -w {wordlist} -H \"Host: FUZZ.{target}\" {codes_string} {size_string} -o {ffuf_report_path(target)}"
     # print(f"Running: {command}")
 
-    subprocess.run(command, check=True, shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    try:
+        subprocess.run(command, check=True, shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=10)
+    except subprocess.TimeoutExpired:
+        return None
 
     with open(ffuf_report_path(target), 'r') as file:
         scan = file.read()
@@ -165,25 +166,28 @@ def main():
     preliminary_subdomain_scan_results = []
     for args in subdomain_enum_args:
         tmp_result = run_subdomain_enum_scan(target, args, fuff_dummy_wordlist)
-        # if the dummy-test triggered results, the configuration is invalid
-        if len(tmp_result['results']) < 1:
-            print('-', end="", flush=True)
-            preliminary_subdomain_scan_results.append([tmp_result, args])
-        else:
-            print('+', end="", flush=True)
-            results = tmp_result['results']
-            sizes = {}
+        if tmp_result == None:
+            print('x', end="", flush=True)
+        else: 
+            # if the dummy-test triggered results, the configuration is invalid
+            if len(tmp_result['results']) < 1:
+                print('+', end="", flush=True)
+                preliminary_subdomain_scan_results.append([tmp_result, args])
+            else:
+                print('-', end="", flush=True)
+                results = tmp_result['results']
+                sizes = {}
 
-            for result in results:
-                length = result['length']
-                if length in sizes:
-                    sizes[length] = sizes[length] + 1
-                else:
-                    sizes[length] = 1
-            
-            for key, value in sizes.items():
-                if (value > 3 and not any(x == key for x in disallowed_sizes)): 
-                    disallowed_sizes.append(key)
+                for result in results:
+                    length = result['length']
+                    if length in sizes:
+                        sizes[length] = sizes[length] + 1
+                    else:
+                        sizes[length] = 1
+                
+                for key, value in sizes.items():
+                    if (value > 3 and not any(x == key for x in disallowed_sizes)): 
+                        disallowed_sizes.append(key)
         
     print(f"\n{len(preliminary_subdomain_scan_results)} preliminary subdomain fuzz configurations are favorable\n")
 
@@ -198,11 +202,14 @@ def main():
     subdomain_scan_results = []
     for potentially_good_configuration in augmented_scan_configurations:
         result = run_subdomain_enum_scan(target, potentially_good_configuration, subdomain_wordlist_small)
-        subdomain_scan_results.append(result)
-        if len(result['results']) > 0:
-            print('+', end="", flush=True)
+        if result == None:
+            print('x', end="", flush=True)
         else:
-            print('-', end="", flush=True)
+            subdomain_scan_results.append(result)
+            if len(result['results']) > 0:
+                print('+', end="", flush=True)
+            else:
+                print('-', end="", flush=True)
 
     all_hosts_results = [] 
     for scan_result in subdomain_scan_results:
@@ -216,11 +223,6 @@ def main():
             print(f"[Subdomain] {result}")
     else:
         print("No subdomain found.")
-
-    ## TODO - target specific ports for fuzzing
-
-    # if any(open_port['port_number'] == '443' for open_port in report['open_ports']):
-    #    run_subdomain_enum_scan(target, use_https=True)
 
 if __name__ == '__main__':
     main()
