@@ -1,0 +1,6 @@
+#!/bin/bash
+ scriptDir=$(dirname -- "$(readlink -f -- "$BASH_SOURCE")")
+
+function web_scan {
+    sudo python "$scriptDir/scan.py" $@
+}
