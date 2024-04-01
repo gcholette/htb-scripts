@@ -29,6 +29,7 @@ mx
 imap
 old
 new
+gitea
 mobile
 mysql
 beta

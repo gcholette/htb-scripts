@@ -15,7 +15,6 @@ autodiscover
 autoconfig
 ns
 test
-gitea
 m
 blog
 dev
