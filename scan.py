@@ -15,8 +15,12 @@ use_nmap_pn = False
 
 hosts_file_path = '/etc/hosts'
 script_dir = os.path.dirname(os.path.abspath(__file__))
+cewl_http_wl_filename = os.path.join(script_dir, 'wordlists/generated/cewl-http-wordlist.txt')
+cewl_https_wl_filename = os.path.join(script_dir, 'wordlists/generated/cewl-https-wordlist.txt')
+merged_wordlist_filename = os.path.join(script_dir, 'wordlists/generated/merged.txt')
 
 subdomain_wordlist_small = os.path.join(script_dir, 'wordlists/subdomains-small.txt')
+subdomain_wordlist_large = os.path.join(script_dir, 'wordlists/subdomains-large.txt')
 fuff_dummy_wordlist = os.path.join(script_dir, 'wordlists/dummy-test.txt')
 
 data_path = lambda x: os.path.join(script_dir, f"data/{x}")
@@ -29,9 +33,54 @@ true_false = [True, False]
 # possible_codes = ['', '200', '403', '500', '401', '301', '302', '200,301', '301,302', '200,302', '200,301,302']
 possible_codes = ['', '200', '403', '301']
 disallowed_sizes = []
+open_ports = []
 
 subdomain_enum_args = [(x, y, '') for x in true_false for y in possible_codes]
 
+def cleanup():
+    paths = [ cewl_http_wl_filename, cewl_https_wl_filename, merged_wordlist_filename ]
+    print('Cleaning up...')
+    for path in paths:
+        try:
+            os.remove(path)
+            print(f'Removed {path}')
+        except:
+            pass
+
+def merge_wordlists(listPaths):
+    all_words = []
+
+    for path in listPaths:
+        try:
+            with open(path, 'r') as file:
+                words = file.read().splitlines()
+                all_words.extend(words)
+        except FileNotFoundError:
+            pass
+    
+    with open(merged_wordlist_filename, 'w') as joined_file:
+        joined_file.write('\n'.join(all_words))
+
+
+def generate_cewl_wordlist(target_host, available_ports = []):
+    commands = []
+    executed_commands = 0
+    if 443 in available_ports:
+        commands.append(f"cewl https://{target_host} -w {cewl_https_wl_filename}")
+    if 80 in available_ports:
+        commands.append(f"cewl http://{target_host} -w {cewl_http_wl_filename}")
+    if len(commands) > 0:
+        for command in commands:
+            try:
+                subprocess.run(command, check=True, shell=True, timeout=24, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                executed_commands += 1
+            except subprocess.CalledProcessError as error:
+                print(f'Error running cewl: {error}')
+            except Exception as error:
+                print(f'An unexpected error occurred: {error}')
+
+    return executed_commands
+            
 
 def run_subdomain_enum_scan(target_host, args, wordlist):
     [use_https, codes, size] = args
@@ -175,6 +224,7 @@ def main():
     global disallowed_sizes
     global target_host
     global target_ip
+    global open_ports
 
     parse_arguments()
     setup()    
@@ -201,6 +251,7 @@ def main():
     print("\n*******************************************")
     print("Open Ports:")
     for port in report['open_ports']:
+        open_ports.append(int(port['port_number']))
         print(f"\n[Port]    {port['port_number']}")
         print(f"[Service] {port['service_name']}")
 
@@ -236,6 +287,9 @@ def main():
         
     print(f"\n{len(preliminary_subdomain_scan_results)} preliminary subdomain fuzz configurations are favorable\n")
 
+    generate_cewl_wordlist(target_host, open_ports)
+    merge_wordlists([subdomain_wordlist_small, cewl_http_wl_filename, cewl_https_wl_filename])
+
     print("Running main scans ", end="", flush=True)
     augmented_scan_configurations = [x[1] for x in preliminary_subdomain_scan_results]
     if len(disallowed_sizes) > 0:
@@ -243,7 +297,6 @@ def main():
             augmented_scan_configurations.insert(0, (False, '', size))
             augmented_scan_configurations.insert(0, (True, '', size))
 
-    # print(f"configuration {augmented_scan_configurations}")
     subdomain_scan_results = []
     for potentially_good_configuration in augmented_scan_configurations:
         result = run_subdomain_enum_scan(target_host, potentially_good_configuration, subdomain_wordlist_small)

@@ -17,6 +17,7 @@ ns
 test
 m
 blog
+teamcity
 dev
 www2
 ns3
