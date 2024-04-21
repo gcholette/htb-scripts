@@ -1,10 +1,10 @@
-# offsec-scripts
+# htb-scripts
 
-```
-source /home/kali/workspace/repos/offsec-scripts/cli
+```shell
+source .../offsec-scripts/cli
 ```
 
-```
+```shell
 web_scan ouija.htb 10.10.11.244
 ```
 
