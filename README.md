@@ -1,5 +1,7 @@
 # htb-scripts
 
+Practical scripts for [Hackthebox](https://www.hackthebox.com/)
+
 ```shell
 source .../offsec-scripts/cli
 ```
