@@ -23,6 +23,8 @@ subdomain_wordlist_small = os.path.join(script_dir, 'wordlists/subdomains-small.
 subdomain_wordlist_large = os.path.join(script_dir, 'wordlists/subdomains-large.txt')
 fuff_dummy_wordlist = os.path.join(script_dir, 'wordlists/dummy-test.txt')
 
+used_wordlist = merged_wordlist_filename
+
 data_path = lambda x: os.path.join(script_dir, f"data/{x}")
 nmap_initial_scan_path = lambda x: os.path.join(script_dir, f"data/{x}/nmap_report.xml")
 ffuf_report_path = lambda x: os.path.join(script_dir, f"data/{x}/ffuf_scan.json")
@@ -39,11 +41,10 @@ subdomain_enum_args = [(x, y, '') for x in true_false for y in possible_codes]
 
 def cleanup():
     paths = [ cewl_http_wl_filename, cewl_https_wl_filename, merged_wordlist_filename ]
-    print('Cleaning up...')
+    print('\nCleaning up...')
     for path in paths:
         try:
             os.remove(path)
-            print(f'Removed {path}')
         except:
             pass
 
@@ -59,7 +60,8 @@ def merge_wordlists(listPaths):
             pass
     
     with open(merged_wordlist_filename, 'w') as joined_file:
-        joined_file.write('\n'.join(all_words))
+        lower_words = [x.lower() for x in all_words]
+        joined_file.write('\n'.join(lower_words))
 
 
 def generate_cewl_wordlist(target_host, available_ports = []):
@@ -299,7 +301,7 @@ def main():
 
     subdomain_scan_results = []
     for potentially_good_configuration in augmented_scan_configurations:
-        result = run_subdomain_enum_scan(target_host, potentially_good_configuration, subdomain_wordlist_small)
+        result = run_subdomain_enum_scan(target_host, potentially_good_configuration, used_wordlist)
         if result == None:
             print('x', end="", flush=True)
         else:
@@ -325,6 +327,8 @@ def main():
             add_to_hosts(target_ip, result[0])
     else:
         print("No subdomain found.")
+    
 
 if __name__ == '__main__':
     main()
+    cleanup()
