@@ -12,6 +12,9 @@ proc getDataDir*(): Path =
 proc nmapDataDir*(host: string): Path = 
   getDataDir() / Path(host) / Path("nmap")
 
+proc nmapReportFilePath*(host: string): Path = 
+  nmapDataDir(host) / Path("nmap_report.xml")
+
 proc initializeDataDirs*(host: string) =
    discard existsOrCreateDir(getDataDir())
    discard existsOrCreateDir(getDataDir() / Path(host))
