@@ -1,10 +1,10 @@
-from "std/cmdline" import paramStr, paramCount
+from std/cmdline import paramStr, paramCount
 from strformat import fmt 
 from strutils import join, split
 from sequtils import mapIt
 from sugar import collect
 
-proc obfuscateLatexFromFile (sourceFilePath: string): string =
+proc obfuscateLatexFromFile*(sourceFilePath: string): string =
   ## Reads a LaTeX file, obfuscates it by converting every character 
   ## to its hexadecimal representation, and outputs the result.
   ## Useful for bypassing filters.
@@ -30,5 +30,3 @@ when isMainModule:
   let fileParam = paramStr(1)
 
   echo obfuscateLatexFromFile fileParam
-
-export obfuscateLatexFromFile
