@@ -1,10 +1,6 @@
 import std/[streams, parsexml, strutils, osproc]
 import file_management
 
-proc nmapScan*(host: string) = 
-  let output = execProcess("nmap -sT -T4 -p- -Pn -oX " & nmapReportFilePath(host).string & " " & host)
-  echo output
-
 type
   HostOSInfo* = object
     accuracy*: float
@@ -21,7 +17,9 @@ type
     scanStatus*: string
     osInfo*: HostOSInfo
 
-## wip
+proc nmapScan*(host: string) = 
+  discard execProcess("nmap -sT -T4 -p- -Pn -oX " & nmapReportFilePath(host).string & " " & host)
+
 proc parseNmapReport*(host: string): NmapReport =
   let filename = nmapReportFilePath(host)
   var s = newFileStream(filename.string, fmRead)
