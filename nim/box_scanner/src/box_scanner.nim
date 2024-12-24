@@ -6,6 +6,6 @@ import box_scanner/nmap
 
 
 when isMainModule:
-  let host = "topology.htb"
+  let host = "topoaalogy.htb"
   initializeDataDirs(host)
   nmapScan(host)
