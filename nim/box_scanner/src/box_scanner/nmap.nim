@@ -18,7 +18,7 @@ type
     osInfo*: HostOSInfo
 
 proc nmapScan*(host: string) = 
-  discard execProcess(fmt"nmap -sT -n -T4 -p- -Pn -oX {nmapReportFilePath(host).string} {host}")
+  discard execProcess(fmt"nmap -sS -n -T4 -p- -Pn --min-rate=10000 -oX {nmapReportFilePath(host).string} {host}")
 
 proc parseNmapReport*(host: string): NmapReport =
   let filename = nmapReportFilePath(host)
