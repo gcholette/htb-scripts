@@ -1,4 +1,4 @@
-import std/[streams, parsexml, strutils, osproc]
+import std/[streams, parsexml, strutils, osproc, strformat]
 import file_management
 
 type
@@ -18,7 +18,7 @@ type
     osInfo*: HostOSInfo
 
 proc nmapScan*(host: string) = 
-  discard execProcess("nmap -sT -T4 -p- -Pn -oX " & nmapReportFilePath(host).string & " " & host)
+  discard execProcess(fmt"nmap -sT -n -T4 -p- -Pn -oX {nmapReportFilePath(host).string} {host}")
 
 proc parseNmapReport*(host: string): NmapReport =
   let filename = nmapReportFilePath(host)

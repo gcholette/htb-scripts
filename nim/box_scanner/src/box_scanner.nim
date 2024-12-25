@@ -1,14 +1,16 @@
-# This is just an example to get you started. A typical hybrid package
-# uses this file as the main entry point of the application.
-
-import std/strformat
-import box_scanner/file_management
-import box_scanner/nmap
+import std/[strformat, cmdline]
+import box_scanner/[file_management, nmap, requirements_check]
 
 when isMainModule:
   echo "-- HTB Box Scanner --"
+  if paramCount() < 1:
+    echo "Usage: <target-host>"
+    echo "Example: ./box_scanner topology.htb"
+    quit(1)
+
+  let host = paramStr(1)
   echo "Warming up..."
-  let host = "topology.htb"
+  checkRequirements()
   initializeDataDirs(host)
 
   echo "Running nmap scan..."
