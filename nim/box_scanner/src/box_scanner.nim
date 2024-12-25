@@ -3,15 +3,19 @@ import box_scanner/[file_management, nmap, requirements_check]
 
 when isMainModule:
   echo "-- HTB Box Scanner --"
-  if paramCount() < 1:
-    echo "Usage: <target-host>"
-    echo "Example: ./box_scanner topology.htb"
+
+  if paramCount() < 2:
+    echo "Usage: <target-host> <target-ip>"
+    echo "Example: ./box_scanner topology.htb 10.10.10.10"
     quit(1)
 
+
   let host = paramStr(1)
+  let ip = paramStr(2)
   echo "Warming up..."
   checkRequirements()
   initializeDataDirs(host)
+  updateHostsFile(host, ip)
 
   echo "Running nmap scan..."
   nmapScan(host)
