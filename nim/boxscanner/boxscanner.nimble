@@ -6,7 +6,7 @@ description   = "Scanner for HTB Boxes"
 license       = "MIT"
 srcDir        = "src"
 installExt    = @["nim"]
-bin           = @["box_scanner"]
+bin           = @["boxscanner"]
 
 
 # Dependencies

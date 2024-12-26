@@ -1,5 +1,5 @@
 import std/[streams, parsexml, strutils, osproc, strformat]
-import file_management
+import filemanagement
 
 type
   HostOSInfo* = object
@@ -7,9 +7,9 @@ type
     name*: string
 
 type
-  HostStatus* = enum 
+  HostStatus* {.pure.} = enum 
     Down, Up
-
+  
 type 
   NmapReport* = object
     hostStatus*: HostStatus 
