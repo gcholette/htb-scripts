@@ -1,4 +1,4 @@
-import std/[streams, parsexml, strutils, osproc, strformat]
+import std/[streams, parsexml, strutils, osproc, strformat, files, terminal]
 import filemanagement
 
 type
@@ -18,7 +18,10 @@ type
     osInfo*: HostOSInfo
 
 proc nmapScan*(host: string) = 
-  discard execProcess(fmt"nmap -sS -n -T4 -p- -Pn --min-rate=10000 -oX {nmapReportFilePath(host).string} {host}")
+  if not fileExists(nmapReportFilePath(host)):
+    discard execProcess(fmt"nmap -sS -n -T4 -p- -Pn --min-rate=10000 -oX {nmapReportFilePath(host).string} {host}")
+  else:
+    styledEcho(fgYellow, "Skipping nmap scan, using cache.")
 
 proc parseNmapReport*(host: string): NmapReport =
   let filename = nmapReportFilePath(host)

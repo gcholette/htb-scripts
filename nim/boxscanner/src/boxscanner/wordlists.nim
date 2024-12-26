@@ -23,10 +23,9 @@ proc downloadWordlist(wordlistName: string): Future[void] {.async.} =
       outputFile.write(data)
 
 proc setupWordlists*(): void =
-  echo "Setting up wordlists..."
   let tasks = [
     "subdomains-large.txt",
     "subdomains-small.txt",
     "dummy-test.txt",
   ].mapIt(downloadWordlist(it))
-  waitFor all(tasks)
+  waitFor all tasks

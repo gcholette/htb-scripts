@@ -19,11 +19,18 @@ proc nmapDataDir*(host: string): Path =
 proc nmapReportFilePath*(host: string): Path = 
   nmapDataDir(host) / Path("nmap_report.xml")
 
+proc fuzzDataDir*(host: string): Path = 
+  getDataDir() / Path(host) / Path("ffuf")
+
+proc fuzzReportFilePath*(host: string, reportName: string): Path = 
+  getDataDir() / Path(host) / Path("ffuf") / Path("ffuf_" & reportName & ".json")
+
 proc initializeDataDirs*(host: string) =
    discard existsOrCreateDir(getDataDir())
    discard existsOrCreateDir(wordlistDataDir())
    discard existsOrCreateDir(getDataDir() / Path(host))
    discard existsOrCreateDir(nmapDataDir(host))
+   discard existsOrCreateDir(fuzzDataDir(host))
 
 proc updateHostsFile*(host: string, ip: string): void =
   ## Updates the host file entry for a host and ip.
@@ -52,3 +59,7 @@ proc updateHostsFile*(host: string, ip: string): void =
       buffer.add(fmt"{ip} {host}" & "\n\n")
 
   writeFile(hostsFilePath, buffer)
+
+proc clearCache*(host: string): void =
+  let pathToRemove = getDataDir() / Path(host)
+  removeDir(pathToRemove)
