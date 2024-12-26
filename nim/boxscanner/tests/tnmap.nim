@@ -1,6 +1,6 @@
 import unittest
 
-import box_scanner/nmap
+import boxscanner/nmap
 
 test "parseNmapReport works":
   # todo Add mocks

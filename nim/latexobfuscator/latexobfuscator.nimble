@@ -4,7 +4,7 @@ author        = "gcholette"
 description   = "Basic latex obfuscation"
 license       = "MIT"
 srcDir        = "src"
-bin           = @["latex_obfuscator"]
+bin           = @["latexobfuscator"]
 
 # Dependencies
 requires "nim >= 2.2.0"
