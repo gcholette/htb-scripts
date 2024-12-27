@@ -51,9 +51,8 @@ proc mainScan*() =
   
   echo ""
   echo &"Determining optimal fuzzing parameters for {host}..."
-  let fuzzResult = preliminaryFuzzScans(host)
+  let fuzzResult = determineFuzzParameters(host)
   discard fuzzResult
-
 
 when isMainModule:
   mainScan()

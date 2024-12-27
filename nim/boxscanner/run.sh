@@ -1,4 +1,4 @@
 #!/bin/bash
 
-nimble build -d:ssl -d:ThreadPoolSize=8 -d:FixedChanSize=16
+nimble build
 sudo ./boxscanner $@

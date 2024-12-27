@@ -35,11 +35,11 @@ proc fuzzVhosts(config: FuzzConfiguration, wordlist: string): seq[string] =
     stdout.write("x")
     return @[]
 
-proc preliminaryFuzzScans*(targetHost: string): seq[int] =
+proc determineFuzzParameters*(targetHost: string): seq[int] =
   let protocols = ["http", "https"] 
   let filteredStatusCodes = ["", "200", "403", "301"] 
   var configurations: seq[FuzzConfiguration] = @[]
-  let wordlistFile = wordlistFilePath("dummy-test.txt").string
+  let wordlistFile = wordlistFilePath("configuration-tester.txt").string
 
   for protocol in protocols: 
     for statusCode in filteredStatusCodes: 
