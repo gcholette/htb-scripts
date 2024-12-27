@@ -51,7 +51,7 @@ proc mainScan*() =
   
   echo ""
   echo &"Determining optimal fuzzing parameters for {host}..."
-  let fuzzResult = determineFuzzParameters(host)
+  let fuzzResult = determineFuzzParameters(host, nmapReport.openPorts)
   discard fuzzResult
 
 when isMainModule:

@@ -1,4 +1,4 @@
 #!/bin/bash
 
-nimble build
+nimble build2
 sudo ./boxscanner $@

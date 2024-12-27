@@ -1,4 +1,4 @@
-import std/[strformat, osproc, json, syncio, sequtils, terminal, times]
+import std/[strformat, osproc, json, syncio, sequtils, terminal, times, files, os, strutils]
 import malebolgia
 import filemanagement
 
@@ -10,10 +10,23 @@ type
 
 proc fuzzVhosts(config: FuzzConfiguration, wordlist: string): seq[string] =
   let (protocol, host, filteredStatusCode) = (config.protocol, config.host, config.filteredStatusCode)
+
   let scanFileReportPath = fuzzReportFilePath(host, protocol, filteredStatusCode)
   let statusCodeArg = if filteredStatusCode == "": "" else: &"-fc {filteredStatusCode}"
+
   let command = fmt"ffuf -u {protocol}://{host} -w {wordlist} -H 'Host: FUZZ.{host}' -t 10 -p 0.2 {statusCodeArg} -o {scanFileReportPath.string}"
-  discard execProcess(command)
+
+  if fileExists(scanFileReportPath):
+    removeFile(scanFileReportPath)
+
+  let output = execProcess(command)
+
+  if output.contains("errors occurred"):
+    let err = output.splitLines()[0..2]
+    for e in err:
+      styledEcho(fgRed, e)
+    raise newException(Exception, fmt"An error occured while running ffuf")
+  sleep(1000)
 
   let reportStr = readFile(scanFileReportPath.string)
   let jsonContents = parseJson(reportStr)
@@ -23,19 +36,16 @@ proc fuzzVhosts(config: FuzzConfiguration, wordlist: string): seq[string] =
       if jsonContents["results"].kind == JArray:
         let fuzzResults = jsonContents["results"].getElems()
         if fuzzResults.len > 0:
-          stdout.write("+")
           let value = fuzzResults.mapIt(it["host"].getStr())
           return value
 
-    stdout.write("-")
     return @[]
   except Exception as e:
     styledEcho(fgRed, &"An error occured while parsing ffuf report {scanFileReportPath.string}")
     styledEcho(fgRed, e.msg)
-    stdout.write("x")
     return @[]
 
-proc determineFuzzParameters*(targetHost: string): seq[int] =
+proc determineFuzzParameters*(targetHost: string, ports: seq[int]): seq[int] =
   let protocols = ["http", "https"] 
   let filteredStatusCodes = ["", "200", "403", "301"] 
   var configurations: seq[FuzzConfiguration] = @[]
@@ -57,5 +67,8 @@ proc determineFuzzParameters*(targetHost: string): seq[int] =
   let endTime = epochTime()
   let duration = endTime - startTime
   echo "Done in ", duration, " seconds"
+
+  for i, x in fuzzResults.pairs:
+    echo fmt"{x.len} {configurations[i]}"
 
   return fuzzResults.mapIt(it.len)

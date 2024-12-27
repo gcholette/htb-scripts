@@ -13,3 +13,7 @@ stats
 host
 home
 login
+api
+api-prod
+api-dev
+api-staging

@@ -12,5 +12,5 @@ requires "malebolgia == 1.3.2"
 task docs, "Generates documentation":
   exec "nim doc --project --index:on --outdir:htmldocs ./src/**.nim"
 
-task build, "Builds the project with specific parameters":
-  exec "nim c -d:ssl --out:./boxscanner ./src/boxscanner.nim"
+task build2, "Builds the project with specific parameters":
+  exec "nim c -d:ssl --verbosity:0 --out:./boxscanner ./src/boxscanner.nim"

@@ -27,5 +27,7 @@ proc setupWordlists*(): void =
     "subdomains-large.txt",
     "subdomains-small.txt",
     "dummy-test.txt",
+    "configuration-tester.txt",
+    "top-htb-vhosts.txt",
   ].mapIt(downloadWordlist(it))
   waitFor all tasks
