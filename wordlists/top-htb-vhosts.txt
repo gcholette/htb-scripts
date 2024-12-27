@@ -1,0 +1,15 @@
+internal
+dev
+app
+staging
+blog
+www
+localhost
+teamcity
+admin
+old
+portal
+stats
+host
+home
+login

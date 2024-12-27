@@ -1,5 +1,5 @@
 import std/[strformat, cmdline, posix, terminal]
-import boxscanner/[filemanagement, nmap, requirementscheck, wordlists]
+import boxscanner/[filemanagement, nmap, requirementscheck, wordlists, fuzzer]
 
 proc mainScan*() =
   echo ""
@@ -34,7 +34,7 @@ proc mainScan*() =
   updateHostsFile(host, ip)
 
   echo ""
-  echo "Running nmap scan..."
+  echo &"Scanning for open ports on {host} with nmap..."
   nmapScan(host)
   let nmapReport = parseNmapReport(host)
   if nmapReport.hostStatus == Up:
@@ -48,6 +48,12 @@ proc mainScan*() =
   else:
     styledEcho(fgRed, &"Host {host} is down")
     quit()
+  
+  echo ""
+  echo &"Determining optimal fuzzing parameters for {host}..."
+  let fuzzResult = preliminaryFuzzScans(host)
+  discard fuzzResult
+
 
 when isMainModule:
   mainScan()

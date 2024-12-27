@@ -221,7 +221,6 @@ def add_to_hosts(ip, host):
     else:
         print(f'{host} already exists in {hosts_file_path}')
 
-
 def main():
     global disallowed_sizes
     global target_host
