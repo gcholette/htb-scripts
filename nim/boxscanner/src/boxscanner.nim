@@ -49,13 +49,31 @@ proc mainScan*() =
     styledEcho(fgRed, &"Host {host} is down")
     quit()
 
+  echo ""
   echo "Basic fingerprinting of ports..."
   let fingerprintedPorts = fingerprintPorts(host, nmapReport.openPorts)
 
   echo ""
   echo &"Determining optimal fuzzing parameters for {host}..."
-  let fuzzResult = determineFuzzParameters(host, fingerprintedPorts)
-  discard fuzzResult
+  let favorableConfigurations = determineFuzzParameters(host, fingerprintedPorts)
+  echo ""
+  let fuzzResults = fuzzVhostsByConfigurationFavorability(favorableConfigurations)
+
+  echo ""
+  if fuzzResults.len > 0:
+    styledEcho(fgGreen, "Successfully Identified the following vhosts:")
+    for r in fuzzResults:
+      echo &"- {r}"
+
+    echo "\nUpdating hostsfile with the newly found hosts..."
+    for r in fuzzResults:
+      updateHostsFile(r, ip)
+  else:
+    styledEcho(fgYellow, "Did not identify any vhosts.")
+
+  # Todo, crawl webpages to try to find further vhosts in the source frontend code
+  # ie, napper.htb
+
 
 when isMainModule:
   mainScan()

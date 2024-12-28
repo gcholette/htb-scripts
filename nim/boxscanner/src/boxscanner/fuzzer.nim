@@ -14,7 +14,7 @@ type
     filteredStatusCode: string
 
 type 
-  FavorableResults* = 
+  FavorableConfigurations* = 
     seq[(FuzzConfiguration, ConfigurationFavorability)]
 
 proc fuzzVhosts(config: FuzzConfiguration, wordlist: string): seq[string] =
@@ -54,13 +54,13 @@ proc fuzzVhosts(config: FuzzConfiguration, wordlist: string): seq[string] =
     styledEcho(fgRed, e.msg)
     return @[]
 
-proc determineFuzzParameters*(targetHost: string, ports: FingerprintedPorts): FavorableResults =
+proc determineFuzzParameters*(targetHost: string, ports: FingerprintedPorts): FavorableConfigurations =
   let filteredStatusCodes = ["", "200", "403", "301", "302"] 
   let httpPorts = getPortsByService(ports, http)
   let httpsPorts = getPortsByService(ports, https)
   let wordlistFile = wordlistFilePath("configuration-tester.txt")
   let wordlistLines = countWordlistLines(wordlistFile)
-  let favorabilityDelta = wordlistLines - 5
+  let favorabilityDelta = wordlistLines - 10 
 
   var configurations: seq[FuzzConfiguration] = @[]
 
@@ -95,7 +95,42 @@ proc determineFuzzParameters*(targetHost: string, ports: FingerprintedPorts): Fa
   let duration = endTime - startTime
   echo "Done in ", duration, " seconds"
 
-  for x in favorableResults:
-    echo x
-
   return favorableResults
+
+proc batchFuzzVhosts(configurations: seq[FuzzConfiguration]): seq[string] =
+  let wordlistFile = wordlistFilePath("subdomains-small.txt")
+  var fuzzResults: seq[seq[string]] = newSeq[seq[string]](configurations.len)
+
+  let startTime = epochTime()
+  var m = createMaster()
+  m.awaitAll:
+    for i, config in configurations.pairs:
+      m.spawn fuzzVhosts(config, wordlistFile.string) -> fuzzResults[i]
+
+  let endTime = epochTime()
+  let duration = endTime - startTime
+  echo "Done in ", duration, " seconds"
+
+  var allResults: seq[string] = @[]
+  for rs in fuzzResults:
+    for r in rs:
+      allResults.add(r)
+
+  return deduplicate[string](allResults) 
+
+proc fuzzVhostsByConfigurationFavorability*(favorableConfigurations: FavorableConfigurations): seq[string] =
+  let likelyConfigurations = favorableConfigurations.filterIt(it[1] == cfLikely).mapIt(it[0])
+  let excellentConfigurations = favorableConfigurations.filterIt(it[1] == cfExcellent).mapIt(it[0])
+
+  # If a excellent configuration is found, run only that
+  if excellentConfigurations.len > 0:
+    echo &"Fuzzing vhosts with {excellentConfigurations.len} very favorable configuration(s)..."
+    return batchFuzzVhosts(excellentConfigurations)
+
+  # If no excellent config is found, run likely configurations
+  elif likelyConfigurations.len > 0:
+    echo &"Fuzzing vhosts with {likelyConfigurations.len} very favorable configuration(s)..."
+    return batchFuzzVhosts(likelyConfigurations)
+  
+  # Don't run cfNone configurations as they will just waste time.
+  return @[]
