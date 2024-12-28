@@ -1,5 +1,5 @@
-import std/[strformat, cmdline, posix, terminal]
-import boxscanner/[filemanagement, nmap, requirementscheck, wordlists, fuzzer]
+import std/[strformat, cmdline, posix, terminal, tables]
+import boxscanner/[filemanagement, nmap, requirementscheck, wordlists, fuzzer, fingerprint]
 
 proc mainScan*() =
   echo ""
@@ -22,7 +22,7 @@ proc mainScan*() =
 
   if (paramCount() > 2):
     let options = paramStr(3)
-    if (options == "--clear-cache"):
+    if (options == "--no-cache"):
       styledEcho(fgYellow, "Clearing cache...")
       clearCache(host)
 
@@ -48,10 +48,13 @@ proc mainScan*() =
   else:
     styledEcho(fgRed, &"Host {host} is down")
     quit()
-  
+
+  echo "Basic fingerprinting of ports..."
+  let fingerprintedPorts = fingerprintPorts(host, nmapReport.openPorts)
+
   echo ""
   echo &"Determining optimal fuzzing parameters for {host}..."
-  let fuzzResult = determineFuzzParameters(host, nmapReport.openPorts)
+  let fuzzResult = determineFuzzParameters(host, fingerprintedPorts)
   discard fuzzResult
 
 when isMainModule:

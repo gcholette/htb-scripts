@@ -1,6 +1,6 @@
-import std/[strformat, osproc, json, syncio, sequtils, terminal, times, files, os, strutils]
+import std/[strformat, osproc, json, syncio, sequtils, terminal, times, files, os, strutils, tables]
 import malebolgia
-import filemanagement
+import filemanagement, fingerprint
 
 type
   FuzzConfiguration = object
@@ -45,7 +45,7 @@ proc fuzzVhosts(config: FuzzConfiguration, wordlist: string): seq[string] =
     styledEcho(fgRed, e.msg)
     return @[]
 
-proc determineFuzzParameters*(targetHost: string, ports: seq[int]): seq[int] =
+proc determineFuzzParameters*(targetHost: string, ports: FingerprintedPorts): seq[int] =
   let protocols = ["http", "https"] 
   let filteredStatusCodes = ["", "200", "403", "301"] 
   var configurations: seq[FuzzConfiguration] = @[]
