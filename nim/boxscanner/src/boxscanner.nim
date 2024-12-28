@@ -1,4 +1,4 @@
-import std/[strformat, cmdline, posix, terminal, tables]
+import std/[strformat, cmdline, posix, terminal]
 import boxscanner/[filemanagement, nmap, requirementscheck, wordlists, fuzzer, fingerprint]
 
 proc mainScan*() =

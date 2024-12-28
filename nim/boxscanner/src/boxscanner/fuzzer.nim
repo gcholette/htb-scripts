@@ -1,6 +1,10 @@
-import std/[strformat, osproc, json, syncio, sequtils, terminal, times, files, os, strutils, tables]
+import std/[strformat, osproc, json, syncio, sequtils, terminal, times, files, os, strutils]
 import malebolgia
-import filemanagement, fingerprint
+import filemanagement, fingerprint, wordlists
+
+type
+  ConfigurationFavorability = enum
+    cfNone, cfLikely, cfExcellent
 
 type
   FuzzConfiguration = object
@@ -8,6 +12,10 @@ type
     host: string
     port: int
     filteredStatusCode: string
+
+type 
+  FavorableResults* = 
+    seq[(FuzzConfiguration, ConfigurationFavorability)]
 
 proc fuzzVhosts(config: FuzzConfiguration, wordlist: string): seq[string] =
   let (protocol, host, port, filteredStatusCode) = (config.protocol, config.host, config.port, config.filteredStatusCode)
@@ -46,11 +54,13 @@ proc fuzzVhosts(config: FuzzConfiguration, wordlist: string): seq[string] =
     styledEcho(fgRed, e.msg)
     return @[]
 
-proc determineFuzzParameters*(targetHost: string, ports: FingerprintedPorts): seq[int] =
+proc determineFuzzParameters*(targetHost: string, ports: FingerprintedPorts): FavorableResults =
   let filteredStatusCodes = ["", "200", "403", "301", "302"] 
   let httpPorts = getPortsByService(ports, http)
   let httpsPorts = getPortsByService(ports, https)
-  let wordlistFile = wordlistFilePath("configuration-tester.txt").string
+  let wordlistFile = wordlistFilePath("configuration-tester.txt")
+  let wordlistLines = countWordlistLines(wordlistFile)
+  let favorabilityDelta = wordlistLines - 5
 
   var configurations: seq[FuzzConfiguration] = @[]
 
@@ -70,13 +80,22 @@ proc determineFuzzParameters*(targetHost: string, ports: FingerprintedPorts): se
   var m = createMaster()
   m.awaitAll:
     for i, config in configurations.pairs:
-     m.spawn fuzzVhosts(config, wordlistFile) -> fuzzResults[i]
+     m.spawn fuzzVhosts(config, wordlistFile.string) -> fuzzResults[i]
   
+  var favorableResults: seq[(FuzzConfiguration, ConfigurationFavorability)] = @[]
+  for i, x in fuzzResults.pairs:
+    if x.len >= favorabilityDelta:
+      favorableResults.add((configurations[i], cfNone))
+    elif x.len > 0 and x.len < favorabilityDelta:
+      favorableResults.add((configurations[i], cfExcellent))
+    else:
+      favorableResults.add((configurations[i], cfLikely))
+
   let endTime = epochTime()
   let duration = endTime - startTime
   echo "Done in ", duration, " seconds"
 
-  for i, x in fuzzResults.pairs:
-    echo fmt"{x.len} {configurations[i]}"
+  for x in favorableResults:
+    echo x
 
-  return fuzzResults.mapIt(it.len)
+  return favorableResults

@@ -12,8 +12,6 @@ type
 type
   FingerprintedPorts* = Table[int, FingerprintedPort]
 
-let f = { 1: FingerprintedService.http }.newTable
-
 proc httpBannerGrab(host: string, port: int): bool =
   try:
     var socket = newSocket()

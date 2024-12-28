@@ -1,4 +1,4 @@
-import std/[asyncdispatch, files, httpclient, syncio, strformat, sequtils, asyncfutures]
+import std/[asyncdispatch, files, httpclient, syncio, strformat, sequtils, asyncfutures, paths]
 import filemanagement
 
 const wordlistHttpPath = "https://raw.githubusercontent.com/gcholette/htb-scripts/refs/heads/main/wordlists/"
@@ -31,3 +31,10 @@ proc setupWordlists*(): void =
     "top-htb-vhosts.txt",
   ].mapIt(downloadWordlist(it))
   waitFor all tasks
+
+proc countWordlistLines*(wordlistPath: Path): int =
+  ## Todo - optimise this if ever really needed on big wordlists
+  var count = 0
+  for line in lines(wordlistPath.string):
+    count.inc()
+  return count
