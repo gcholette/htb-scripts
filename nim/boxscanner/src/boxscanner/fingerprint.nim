@@ -2,7 +2,7 @@ import std/[net, strutils, strformat, tables]
 from puppy import fetch, Request, parseUrl
 
 type 
-  FingerprintedService = enum 
+  FingerprintedService* = enum 
     http, https, unknown
 
 type
@@ -57,3 +57,17 @@ proc fingerprintPorts*(host: string, ports: seq[int]): FingerprintedPorts =
     table[p] = FingerprintedPort(service: svc)
 
   return table
+
+proc filterFingerprintedPorts*(ports: FingerprintedPorts, filterBy: FingerprintedService): FingerprintedPorts =
+  var filteredTable = FingerprintedPorts()
+  for k, v in ports:
+    if v.service == filterBy:
+      filteredTable[k] = v
+  return filteredTable
+
+proc getPortsByService*(ports: FingerprintedPorts, filterBy: FingerprintedService): seq[int] =
+  let filteredPorts = filterFingerprintedPorts(ports, filterBy)
+  var acc: seq[int] = @[]
+  for k in filteredPorts.keys:
+    acc.add(k)
+  return acc

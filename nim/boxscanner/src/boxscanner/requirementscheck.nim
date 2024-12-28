@@ -10,7 +10,7 @@ proc requirementsMsg(): void =
 
 proc checkNmapInstall(): void =
   let output = execProcess("nmap -h")
-  if not output.startsWith("Nmap ") or output.contains(", did you mean"):
+  if not output.startsWith("Nmap") or output.contains(", did you mean"):
     requirementsMsg()
     quit("nmap is not installed", 1)
 

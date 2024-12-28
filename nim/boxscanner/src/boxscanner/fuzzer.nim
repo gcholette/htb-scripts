@@ -6,15 +6,16 @@ type
   FuzzConfiguration = object
     protocol: string
     host: string
+    port: int
     filteredStatusCode: string
 
 proc fuzzVhosts(config: FuzzConfiguration, wordlist: string): seq[string] =
-  let (protocol, host, filteredStatusCode) = (config.protocol, config.host, config.filteredStatusCode)
+  let (protocol, host, port, filteredStatusCode) = (config.protocol, config.host, config.port, config.filteredStatusCode)
 
-  let scanFileReportPath = fuzzReportFilePath(host, protocol, filteredStatusCode)
+  let scanFileReportPath = fuzzReportFilePath(host, protocol, port, filteredStatusCode)
   let statusCodeArg = if filteredStatusCode == "": "" else: &"-fc {filteredStatusCode}"
 
-  let command = fmt"ffuf -u {protocol}://{host} -w {wordlist} -H 'Host: FUZZ.{host}' -t 10 -p 0.2 {statusCodeArg} -o {scanFileReportPath.string}"
+  let command = fmt"ffuf -u {protocol}://{host}:{port} -w {wordlist} -H 'Host: FUZZ.{host}' -t 10 -p 0.2 {statusCodeArg} -o {scanFileReportPath.string}"
 
   if fileExists(scanFileReportPath):
     removeFile(scanFileReportPath)
@@ -46,14 +47,22 @@ proc fuzzVhosts(config: FuzzConfiguration, wordlist: string): seq[string] =
     return @[]
 
 proc determineFuzzParameters*(targetHost: string, ports: FingerprintedPorts): seq[int] =
-  let protocols = ["http", "https"] 
-  let filteredStatusCodes = ["", "200", "403", "301"] 
-  var configurations: seq[FuzzConfiguration] = @[]
+  let filteredStatusCodes = ["", "200", "403", "301", "302"] 
+  let httpPorts = getPortsByService(ports, http)
+  let httpsPorts = getPortsByService(ports, https)
   let wordlistFile = wordlistFilePath("configuration-tester.txt").string
 
-  for protocol in protocols: 
+  var configurations: seq[FuzzConfiguration] = @[]
+
+  for p in httpPorts: 
     for statusCode in filteredStatusCodes: 
-      configurations.add(FuzzConfiguration( protocol: protocol, host: targetHost, filteredStatusCode: statusCode ))
+      configurations.add(FuzzConfiguration( protocol: "http", host: targetHost, port: p, filteredStatusCode: statusCode ))
+
+  for p in httpsPorts: 
+    for statusCode in filteredStatusCodes: 
+      configurations.add(FuzzConfiguration( protocol: "https", host: targetHost, port: p, filteredStatusCode: statusCode ))
+
+  echo &"Testing {configurations.len} configurations"
 
   var fuzzResults: seq[seq[string]] = newSeq[seq[string]](configurations.len)
   let startTime = epochTime()
@@ -62,7 +71,6 @@ proc determineFuzzParameters*(targetHost: string, ports: FingerprintedPorts): se
   m.awaitAll:
     for i, config in configurations.pairs:
      m.spawn fuzzVhosts(config, wordlistFile) -> fuzzResults[i]
-  echo ""
   
   let endTime = epochTime()
   let duration = endTime - startTime
