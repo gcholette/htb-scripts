@@ -1,9 +1,9 @@
-import std/[strformat, cmdline, posix, terminal]
+import std/[strformat, cmdline, posix, terminal, tables]
 import boxscanner/[filemanagement, nmap, requirementscheck, wordlists, fuzzer, fingerprint]
 
 proc mainScan*() =
   echo ""
-  styledEcho(fgCyan,"-- HTB Box Scanner --")
+  styledEcho(fgCyan,"-- HTB Box Scanner 1.0.0 --")
 
   if not (getuid() == 0):
     styledEcho(fgRed, "boxscanner must be run as root")
@@ -22,7 +22,7 @@ proc mainScan*() =
 
   if (paramCount() > 2):
     let options = paramStr(3)
-    if (options == "--no-cache"):
+    if (options == "--clear-cache"):
       styledEcho(fgYellow, "Clearing cache...")
       clearCache(host)
 
@@ -52,6 +52,10 @@ proc mainScan*() =
   echo ""
   echo "Basic fingerprinting of ports..."
   let fingerprintedPorts = fingerprintPorts(host, nmapReport.openPorts)
+  if fingerprintedPorts.len > 0:
+    styledEcho(fgGreen, "Fingerprinted the following:")
+    for k, v in fingerprintedPorts:
+      echo &"- {k}: {v.service}"
 
   echo ""
   echo &"Determining optimal fuzzing parameters for {host}..."
@@ -59,7 +63,6 @@ proc mainScan*() =
   echo ""
   let fuzzResults = fuzzVhostsByConfigurationFavorability(favorableConfigurations)
 
-  echo ""
   if fuzzResults.len > 0:
     styledEcho(fgGreen, "Successfully Identified the following vhosts:")
     for r in fuzzResults:
@@ -70,6 +73,26 @@ proc mainScan*() =
       updateHostsFile(r, ip)
   else:
     styledEcho(fgYellow, "Did not identify any vhosts.")
+
+  echo ""
+  styledEcho(fgCyan, "-- Summary --")
+  stdout.styledWrite(fgCyan, "Host: ")
+  echo &"{host} {ip}"
+  styledEcho(fgCyan, "Open ports:")
+  if fingerprintedPorts.len > 0:
+    for k, v in fingerprintedPorts:
+      echo &"- {k}: {v.service}"
+  else:
+    styledEcho(fgYellow, "Did not identify any open ports.")
+  
+  styledEcho(fgCyan, "Vhosts:")
+  if fuzzResults.len > 0:
+    for r in fuzzResults:
+      echo &"- {r}"
+
+  else:
+    styledEcho(fgYellow, "Did not identify any vhosts.")
+
 
   # Todo, crawl webpages to try to find further vhosts in the source frontend code
   # ie, napper.htb
