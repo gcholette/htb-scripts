@@ -1,4 +1,4 @@
-import std/[strformat, osproc, json, syncio, sequtils, terminal, times, files, os, strutils, tables]
+import std/[strformat, osproc, json, syncio, sequtils, terminal, times, files, strutils, tables]
 import malebolgia
 import filemanagement, fingerprint, wordlists
 

@@ -1,5 +1,5 @@
 import std/[strformat, cmdline, posix, terminal, tables]
-import boxscanner/[filemanagement, nmap, requirementscheck, wordlists, fuzzer, fingerprint]
+import boxscanner/[filemanagement, nmap, requirementscheck, wordlists, fuzzer, fingerprint, fnutils]
 
 proc mainScan*() =
   echo ""
