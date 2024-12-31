@@ -1,6 +1,6 @@
-import std/[strformat, osproc, json, syncio, sequtils, terminal, times, files, strutils, tables]
+import std/[strformat, osproc, json, syncio, sequtils, terminal, times, files, strutils, tables, paths]
 import malebolgia
-import filemanagement, fingerprint, wordlists
+import filemanagement, fingerprint, wordlists, fnutils
 
 type
   ConfigurationFavorability = enum
@@ -92,91 +92,44 @@ proc identifyFavorableSizeParameter*(configs: seq[FuzzConfiguration], maxResults
       styledEcho(fgRed, &"An error occured while parsing ffuf report {scanFileReportPath.string}")
       styledEcho(fgRed, e.msg)
     
-    # counter and a for loop :sadface:
-    var sizeCounter = initTable[int, int]()
-    for x in foundLengths:
-      sizeCounter[x] = sizeCounter.getOrDefault(x) + 1
+    let sizeCounter = foundLengths.uFold(
+      func(acc: var Table[int, int], curr: int) = 
+        acc[curr] = acc.getOrDefault(curr) + 1, 
+      initTable[int, int]()
+    )
 
-    var maxSize: (int, int) = (0, 0)
-    for k, v in sizeCounter:
-      if v > maxSize[1]:
-        maxSize = (k, v)
+    let maxSize = sizeCounter.pairs.toSeq.uFold(
+      func(acc: (int, int), curr: (int, int)): (int, int) = 
+        if curr[1] > acc[1]: return curr
+        else: return acc,
+      (0, 0)
+    )
 
-    if not any(identifiedSizes, proc (x: int): bool = x == maxSize[0]) and maxSize[0] != 0:
+    if not any(
+        identifiedSizes, 
+        proc (x: int): bool = x == maxSize[0]
+      ) and maxSize[0] != 0:
       identifiedSizes.add(maxSize[0])
 
   return identifiedSizes
 
-proc determineFuzzParameters*(targetHost: string, ports: FingerprintedPorts): FavorableConfigurations =
-  ## Todo - refactor this function
-  let filteredStatusCodes = ["", "200", "403", "301", "302"] 
-  let httpPorts = getPortsByService(ports, http)
-  let httpsPorts = getPortsByService(ports, https)
-  let wordlistFile = wordlistFilePath("configuration-tester.txt")
-  let wordlistLines = countWordlistLines(wordlistFile)
-  let favorabilityDelta = wordlistLines - 10 
-
-  var configurations: seq[FuzzConfiguration] = @[]
-
-  for p in httpPorts: 
-    for statusCode in filteredStatusCodes: 
-      configurations.add(FuzzConfiguration( protocol: "http", host: targetHost, port: p, filteredStatusCode: statusCode ))
-
-  for p in httpsPorts: 
-    for statusCode in filteredStatusCodes: 
-      configurations.add(FuzzConfiguration( protocol: "https", host: targetHost, port: p, filteredStatusCode: statusCode ))
-
-  echo &"Testing {configurations.len} configurations"
-
-  var preliminaryFuzzResults: seq[seq[string]] = newSeq[seq[string]](configurations.len)
-
-  ## Fuzz with initial configurations
-  let startTime = epochTime()
+proc fuzzVhostsConfigurations(
+  configurations: seq[FuzzConfiguration], 
+  wordlistFile: Path
+): seq[(Fuzzconfiguration, int)] =
+  var finalFuzzResults: seq[seq[string]] = newSeq[seq[string]](configurations.len)
   var m = createMaster()
+
+  let startTime = epochTime()
   m.awaitAll:
     for i, config in configurations.pairs:
-     m.spawn fuzzVhosts(config, wordlistFile.string) -> preliminaryFuzzResults[i]
+     m.spawn fuzzVhosts(config, wordlistFile.string) -> finalFuzzResults[i]
+
   let endTime = epochTime()
-  let duration = endTime - startTime
-  echo "Done in ", duration, " seconds"
+  echo "Done in ", endTime - startTime, " seconds"
 
-  ## Look for a size filter
-  let sizeParameters = identifyFavorableSizeParameter(configurations, wordlistLines)
-
-  var finalConfigurations: seq[FuzzConfiguration] = @[]
-  for c in configurations:
-    finalConfigurations.add(c)
-    if sizeParameters.len > 0:
-      var conf2 = c
-      conf2.filteredSize = sizeParameters[0]
-      finalConfigurations.add(conf2)
-
-  echo &"Testing {finalConfigurations.len} configurations"
-  var finalFuzzResults: seq[seq[string]] = newSeq[seq[string]](finalConfigurations.len)
-
-  ## Re-fuzz with initial configurations
-  let startTime2 = epochTime()
-  var m2 = createMaster()
-  m2.awaitAll:
-    for i, config in finalConfigurations.pairs:
-     m2.spawn fuzzVhosts(config, wordlistFile.string) -> finalFuzzResults[i]
-  let endTime2 = epochTime()
-  let duration2 = endTime2 - startTime2
-  echo "Done in ", duration2, " seconds"
-  
-  var favorableResults: seq[(FuzzConfiguration, ConfigurationFavorability)] = @[]
-  for i, x in finalFuzzResults.pairs:
-    if x.len >= favorabilityDelta:
-      favorableResults.add((finalConfigurations[i], cfNone))
-    elif x.len > 0 and x.len < favorabilityDelta:
-      favorableResults.add((finalConfigurations[i], cfExcellent))
-    else:
-      favorableResults.add((finalConfigurations[i], cfLikely))
-
-  ## todo, select only some of the cfExcellent configurations 
-  ## based on which has the highest amount of hits
-
-  return favorableResults
+  for i, r in finalFuzzResults.pairs:
+    result.add((configurations[i], r.len))
 
 proc batchFuzzVhosts(configurations: seq[FuzzConfiguration]): seq[string] =
   let wordlistFile = wordlistFilePath("subdomains-small.txt")
@@ -210,9 +163,89 @@ proc fuzzVhostsByConfigurationFavorability*(favorableConfigurations: FavorableCo
 
   # If no excellent config is found, run likely configurations
   elif likelyConfigurations.len > 0:
-    echo &"Fuzzing vhosts with {likelyConfigurations.len} very favorable configuration(s)..."
+    echo &"Fuzzing vhosts with {likelyConfigurations.len} somewhat favorable configuration(s)..."
     return batchFuzzVhosts(likelyConfigurations)
   
   # Don't run cfNone configurations as they will just waste time.
   styledEcho(fgYellow, "No favorable configuration for fuzzing, skipping.")
   return @[]
+
+proc getPreliminaryConfigurations(
+  targetHost: string, 
+  ports: FingerprintedPorts
+): seq[FuzzConfiguration] =
+  let filteredStatusCodes = ["", "200", "403", "301", "302"] 
+  let httpPorts = getPortsByService(ports, http)
+  let httpsPorts = getPortsByService(ports, https)
+
+  for p in httpPorts: 
+    for statusCode in filteredStatusCodes: 
+      result.add(FuzzConfiguration( protocol: "http", host: targetHost, port: p, filteredStatusCode: statusCode ))
+
+  for p in httpsPorts: 
+    for statusCode in filteredStatusCodes: 
+      result.add(FuzzConfiguration( protocol: "https", host: targetHost, port: p, filteredStatusCode: statusCode ))
+
+proc updateConfigurationWithSizes(
+  configurations: seq[FuzzConfiguration], 
+  sizeParameters: seq[int]
+): seq[FuzzConfiguration] =
+  for c in configurations:
+    result.add(c)
+    if sizeParameters.len > 0:
+      var conf2 = c
+      conf2.filteredSize = sizeParameters[0]
+      result.add(conf2)
+
+proc determineFuzzParameters*(
+  targetHost: string, 
+  ports: FingerprintedPorts
+): FavorableConfigurations =
+  let wordlistFile = wordlistFilePath("configuration-tester.txt")
+  let wordlistLines = countWordlistLines(wordlistFile)
+  let preliminaryConfigurations = getPreliminaryConfigurations(targetHost, ports)
+  let favorabilityDelta = wordlistLines - 10 
+
+  echo &"Testing {preliminaryConfigurations.len} preliminary configurations"
+
+  # Run it a first time to generate json reports
+  discard fuzzVhostsConfigurations(preliminaryConfigurations, wordlistFile)
+
+  ## Look for a size filter in those json reports
+  let sizeParameters = 
+    identifyFavorableSizeParameter(preliminaryConfigurations, wordlistLines)
+
+  let finalConfigurations: seq[FuzzConfiguration] = 
+    updateConfigurationWithSizes(preliminaryConfigurations, sizeParameters)
+
+  echo &"Testing {finalConfigurations.len} configurations"
+  let finalFuzzResults = fuzzVhostsConfigurations(finalConfigurations, wordlistFile)
+  
+  var favorableResults: seq[(FuzzConfiguration, ConfigurationFavorability)] = @[]
+  for (conf, hits) in finalFuzzResults:
+    if hits >= favorabilityDelta:
+      favorableResults.add((conf, cfNone))
+    elif hits > 0 and hits < favorabilityDelta:
+      favorableResults.add((conf, cfExcellent))
+    else:
+      favorableResults.add((conf, cfLikely))
+  
+  let noneConfigurations = favorableResults.filterIt(it[1] == cfNone).mapIt(it[0])
+  let likelyConfigurations = favorableResults.filterIt(it[1] == cfLikely).mapIt(it[0])
+  let excellentConfigurations = favorableResults.filterIt(it[1] == cfExcellent).mapIt(it[0])
+
+  if excellentConfigurations.len > 0:
+    styledEcho(fgGreen, &"Identified {excellentConfigurations.len} very favorable configurations")
+    for c in excellentConfigurations:
+      echo &"- port: {c.port}, proto: {c.protocol}, code: {c.filteredStatusCode}, size: {c.filteredSize}"
+  elif excellentConfigurations.len == 0:
+    styledEcho(fgYellow, &"Identified {excellentConfigurations.len} very favorable configurations")
+    if likelyConfigurations.len > 0:
+      styledEcho(fgYellow, &"Identified {likelyConfigurations.len} somewhat favorable configurations")
+    elif noneConfigurations.len > 0:
+      styledEcho(fgYellow, &"Identified {noneConfigurations.len} bad configurations")
+
+  ## todo, select only some of the cfExcellent configurations 
+  ## based on which has the highest amount of hits
+
+  return favorableResults

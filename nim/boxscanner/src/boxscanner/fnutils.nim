@@ -1,4 +1,4 @@
-import std/[macros, sugar]
+import std/sugar
 
 ##
 ## Some general FP utilities
@@ -41,21 +41,4 @@ proc uFold*[Acc, Cur](
   result = first
   for x in input:
     fn(result, x)
-
-macro `|>`*(lhs, rhs: untyped): untyped =
-  ## Pipe operator, inserts the piped argument as the first arg of
-  ## the piped functions. Still doesn't work with newlines with
-  ## correct indentation tough.
-  runnableExamples:
-    import std/strformat
-    proc fn1(x: int): int = x - 1
-    proc fn2(x: int, y: string, z: string): string = fmt"{x}{y}{z}"
-
-    assert 1 |> fn1 |> fn2("_", "-") == "0_-"
-
-  case rhs.kind:
-  of nnkIdent:
-    result = newCall(rhs, lhs)
-  else:
-    result = rhs
-    result.insert(1, lhs)
+  
