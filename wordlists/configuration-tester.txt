@@ -27,3 +27,4 @@ api
 api-prod
 api-dev
 api-staging
+latex

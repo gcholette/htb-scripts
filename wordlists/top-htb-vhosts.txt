@@ -10,6 +10,7 @@ admin
 old
 portal
 stats
+latex
 host
 home
 login

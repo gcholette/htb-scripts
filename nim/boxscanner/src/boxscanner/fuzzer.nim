@@ -14,9 +14,14 @@ type
     filteredStatusCode: string
     filteredSize: int
 
+type FavorableConfiguration = object
+  configuration: FuzzConfiguration
+  favorability: ConfigurationFavorability
+  hits: int
+  hitsLimit: int
+
 type 
-  FavorableConfigurations* = 
-    seq[(FuzzConfiguration, ConfigurationFavorability)]
+  FavorableConfigurations* = seq[FavorableConfiguration]
 
 proc fuzzVhosts(config: FuzzConfiguration, wordlist: string): seq[string] =
   let (
@@ -33,7 +38,7 @@ proc fuzzVhosts(config: FuzzConfiguration, wordlist: string): seq[string] =
     config.filteredSize
   )
 
-  let scanFileReportPath = fuzzReportFilePath(host, protocol, port, filteredStatusCode)
+  let scanFileReportPath = fuzzReportFilePath(host, protocol, port, filteredStatusCode, filteredSize)
   let statusCodeArg = if filteredStatusCode == "": "" else: &"-fc {filteredStatusCode}"
   let sizeArg = if filteredSize == 0: "" else: &"-fs {filteredSize}"
 
@@ -75,7 +80,7 @@ proc identifyFavorableSizeParameter*(configs: seq[FuzzConfiguration], maxResults
   
   for config in configs:
     let (protocol, host, port, filteredStatusCode) = (config.protocol, config.host, config.port, config.filteredStatusCode)
-    let scanFileReportPath = fuzzReportFilePath(host, protocol, port, filteredStatusCode)
+    let scanFileReportPath = fuzzReportFilePath(host, protocol, port, filteredStatusCode, 0)
     let reportStr = readFile(scanFileReportPath.string)
     let jsonContents = parseJson(reportStr)
     var foundLengths: seq[int] = @[]
@@ -153,8 +158,8 @@ proc batchFuzzVhosts(configurations: seq[FuzzConfiguration]): seq[string] =
   return deduplicate[string](allResults) 
 
 proc fuzzVhostsByConfigurationFavorability*(favorableConfigurations: FavorableConfigurations): seq[string] =
-  let likelyConfigurations = favorableConfigurations.filterIt(it[1] == cfLikely).mapIt(it[0])
-  let excellentConfigurations = favorableConfigurations.filterIt(it[1] == cfExcellent).mapIt(it[0])
+  let likelyConfigurations = favorableConfigurations.filterIt(it.favorability == cfLikely).mapIt(it.configuration)
+  let excellentConfigurations = favorableConfigurations.filterIt(it.favorability == cfExcellent).mapIt(it.configuration)
 
   # If a excellent configuration is found, run only that
   if excellentConfigurations.len > 0:
@@ -221,31 +226,74 @@ proc determineFuzzParameters*(
   echo &"Testing {finalConfigurations.len} configurations"
   let finalFuzzResults = fuzzVhostsConfigurations(finalConfigurations, wordlistFile)
   
-  var favorableResults: seq[(FuzzConfiguration, ConfigurationFavorability)] = @[]
+  var favorableResults: FavorableConfigurations = @[]
   for (conf, hits) in finalFuzzResults:
     if hits >= favorabilityDelta:
-      favorableResults.add((conf, cfNone))
+      favorableResults.add(
+        FavorableConfiguration(
+          configuration: conf, 
+          favorability: cfNone, 
+          hits: hits, 
+          hitsLimit: wordlistLines
+        )
+      )
     elif hits > 0 and hits < favorabilityDelta:
-      favorableResults.add((conf, cfExcellent))
+      favorableResults.add(
+        FavorableConfiguration(
+          configuration: conf, 
+          favorability: cfExcellent, 
+          hits: hits, 
+          hitsLimit: wordlistLines
+        )
+      )
     else:
-      favorableResults.add((conf, cfLikely))
+      favorableResults.add(
+        FavorableConfiguration(
+          configuration: conf, 
+          favorability: cfLikely, 
+          hits: hits, 
+          hitsLimit: wordlistLines
+        )
+      )
   
-  let noneConfigurations = favorableResults.filterIt(it[1] == cfNone).mapIt(it[0])
-  let likelyConfigurations = favorableResults.filterIt(it[1] == cfLikely).mapIt(it[0])
-  let excellentConfigurations = favorableResults.filterIt(it[1] == cfExcellent).mapIt(it[0])
+  let noneResults = favorableResults
+    .filterIt(it.favorability == cfNone)
+  let likelyResults = favorableResults
+    .filterIt(it.favorability == cfLikely)
+  let excellentResults = favorableResults
+    .filterIt(it.favorability == cfExcellent)
 
-  if excellentConfigurations.len > 0:
-    styledEcho(fgGreen, &"Identified {excellentConfigurations.len} very favorable configurations")
-    for c in excellentConfigurations:
-      echo &"- port: {c.port}, proto: {c.protocol}, code: {c.filteredStatusCode}, size: {c.filteredSize}"
-  elif excellentConfigurations.len == 0:
-    styledEcho(fgYellow, &"Identified {excellentConfigurations.len} very favorable configurations")
-    if likelyConfigurations.len > 0:
-      styledEcho(fgYellow, &"Identified {likelyConfigurations.len} somewhat favorable configurations")
-    elif noneConfigurations.len > 0:
-      styledEcho(fgYellow, &"Identified {noneConfigurations.len} bad configurations")
+  if excellentResults.len > 0:
+    styledEcho(fgGreen, &"Identified {excellentResults.len} very favorable configurations:")
+    for r in excellentResults:
+      let c = r.configuration
+      echo &"- port: {c.port}, proto: {c.protocol}, code: {c.filteredStatusCode}, size: {c.filteredSize}, hits: {r.hits}"
+    
+    let mostFavorableResult = excellentResults.uFold(
+      proc(
+        acc: FavorableConfiguration, 
+        curr: FavorableConfiguration
+      ): FavorableConfiguration =
+        if curr.hits > acc.hits:
+          return curr
+        return acc,
+      excellentResults[0]
+    )
 
-  ## todo, select only some of the cfExcellent configurations 
-  ## based on which has the highest amount of hits
+    styledEcho(fgGreen, "Most favorable configuration is: ")
+    let c = mostFavorableResult.configuration
+    echo &"- port: {c.port}, proto: {c.protocol}, code: {c.filteredStatusCode}, size: {c.filteredSize}, hits: {mostFavorableResult.hits}"
 
+    return @[mostFavorableResult]
+
+  elif excellentResults.len == 0:
+    styledEcho(fgYellow, &"Identified no very favorable configurations.")
+    if likelyResults.len > 0:
+      styledEcho(fgYellow, &"Identified {likelyResults.len} somewhat favorable configurations.")
+      for r in excellentResults:
+        let c = r.configuration
+        echo &"- port: {c.port}, proto: {c.protocol}, code: {c.filteredStatusCode}, size: {c.filteredSize}, hits: {r.hits}"
+    elif noneResults.len > 0:
+      styledEcho(fgYellow, &"Identified {noneResults.len} bad configurations.")
+    
   return favorableResults

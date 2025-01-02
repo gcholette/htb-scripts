@@ -22,9 +22,9 @@ proc nmapReportFilePath*(host: string): Path =
 proc fuzzDataDir*(host: string): Path = 
   getDataDir() / Path(host) / Path("ffuf")
 
-proc fuzzReportFilePath*(host: string, protocol: string, port: int, filterCode: string): Path = 
+proc fuzzReportFilePath*(host: string, protocol: string, port: int, filterCode: string, filterSize: int): Path = 
   let filterCodeStr = if filterCode == "": "none" else: filterCode
-  getDataDir() / Path(host) / Path("ffuf") / Path(fmt"ffuf_proto-{protocol}_port-{port}_fs-{filterCodeStr}.json")
+  getDataDir() / Path(host) / Path("ffuf") / Path(fmt"ffuf_proto-{protocol}_port-{port}_fc-{filterCodeStr}_fs-{filterSize}.json")
 
 proc initializeDataDirs*(host: string) =
    discard existsOrCreateDir(getDataDir())

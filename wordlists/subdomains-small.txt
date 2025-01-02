@@ -11,6 +11,7 @@ cpanel
 whm
 ns1
 ns2
+latex
 autodiscover
 autoconfig
 ns
