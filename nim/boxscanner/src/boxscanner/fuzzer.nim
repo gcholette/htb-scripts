@@ -206,6 +206,8 @@ proc determineFuzzParameters*(
   targetHost: string, 
   ports: FingerprintedPorts
 ): FavorableConfigurations =
+  # Todo, update configuration to contain the target wordlist, based on the 
+  # performance of the host being scanned (bigger wordlists for faster hosts)
   let wordlistFile = wordlistFilePath("configuration-tester.txt")
   let wordlistLines = countWordlistLines(wordlistFile)
   let preliminaryConfigurations = getPreliminaryConfigurations(targetHost, ports)
