@@ -1,9 +1,12 @@
-import std/[strformat, cmdline, posix, terminal, tables]
-import boxscanner/[filemanagement, nmap, requirementscheck, wordlists, fuzzer, fingerprint, fnutils]
+import std/[strformat, cmdline, posix, terminal, tables, strutils]
+import boxscanner/[filemanagement, nmap, requirementscheck, wordlists, fuzzer, fingerprint]
+
+const nimbleContents = staticRead("../boxscanner.nimble")
+let version = nimbleContents.split("\n")[0].split('=')[1].strip(chars = { '"', ' ' })
 
 proc mainScan*() =
   echo ""
-  styledEcho(fgCyan,"-- HTB Box Scanner 1.0.0 --")
+  styledEcho(fgCyan, &"-- HTB Box Scanner {version} --")
 
   if not (getuid() == 0):
     styledEcho(fgRed, "boxscanner must be run as root")
@@ -17,7 +20,7 @@ proc mainScan*() =
   let host = paramStr(1)
   let ip = paramStr(2)
   echo "Warming up..."
-  echo "Checking system requirements..."
+  styleDim.styledEcho "Checking system requirements..."
   checkRequirements()
 
   if (paramCount() > 2):
@@ -26,11 +29,11 @@ proc mainScan*() =
       styledEcho(fgYellow, "Clearing cache...")
       clearCache(host)
 
-  echo "Setting up cache..."
+  styleDim.styledEcho "Setting up cache..."
   initializeDataDirs(host)
-  echo "Setting up wordlists..."
+  styleDim.styledEcho "Setting up wordlists..."
   setupWordlists()
-  echo "Setting up hostfile..."
+  styleDim.styledEcho "Setting up hostfile..."
   updateHostsFile(host, ip)
 
   echo ""
@@ -50,7 +53,7 @@ proc mainScan*() =
     quit()
 
   echo ""
-  echo "Basic fingerprinting of ports..."
+  echo "Fingerprinting ports..."
   let fingerprintedPorts = fingerprintPorts(host, nmapReport.openPorts)
   if fingerprintedPorts.len > 0:
     styledEcho(fgGreen, "Fingerprinted the following:")
@@ -68,7 +71,6 @@ proc mainScan*() =
     for r in fuzzResults:
       echo &"- {r}"
 
-    echo "\nUpdating hostsfile with the newly found hosts..."
     for r in fuzzResults:
       updateHostsFile(r, ip)
   else:

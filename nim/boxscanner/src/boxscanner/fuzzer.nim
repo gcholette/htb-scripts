@@ -131,7 +131,7 @@ proc fuzzVhostsConfigurations(
      m.spawn fuzzVhosts(config, wordlistFile.string) -> finalFuzzResults[i]
 
   let endTime = epochTime()
-  echo "Done in ", endTime - startTime, " seconds"
+  styleDim.styledEcho &"Done in {(endTime - startTime):.2f} seconds"
 
   for i, r in finalFuzzResults.pairs:
     result.add((configurations[i], r.len))
@@ -147,8 +147,7 @@ proc batchFuzzVhosts(configurations: seq[FuzzConfiguration]): seq[string] =
       m.spawn fuzzVhosts(config, wordlistFile.string) -> fuzzResults[i]
 
   let endTime = epochTime()
-  let duration = endTime - startTime
-  echo "Done in ", duration, " seconds"
+  styleDim.styledEcho &"Done in {(endTime - startTime):.2f} seconds"
 
   var allResults: seq[string] = @[]
   for rs in fuzzResults:
@@ -213,7 +212,7 @@ proc determineFuzzParameters*(
   let preliminaryConfigurations = getPreliminaryConfigurations(targetHost, ports)
   let favorabilityDelta = wordlistLines - 10 
 
-  echo &"Testing {preliminaryConfigurations.len} preliminary configurations"
+  styleDim.styledEcho &"Testing {preliminaryConfigurations.len} preliminary configurations"
 
   # Run it a first time to generate json reports
   discard fuzzVhostsConfigurations(preliminaryConfigurations, wordlistFile)
@@ -225,7 +224,7 @@ proc determineFuzzParameters*(
   let finalConfigurations: seq[FuzzConfiguration] = 
     updateConfigurationWithSizes(preliminaryConfigurations, sizeParameters)
 
-  echo &"Testing {finalConfigurations.len} configurations"
+  styleDim.styledEcho &"Testing {finalConfigurations.len} configurations"
   let finalFuzzResults = fuzzVhostsConfigurations(finalConfigurations, wordlistFile)
   
   var favorableResults: FavorableConfigurations = @[]
